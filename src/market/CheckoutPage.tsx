@@ -2,7 +2,9 @@ import { useState, type ReactNode } from "react";
 import type { Address, Coupon, PaymentMethod } from "./types";
 import { ADDRESSES, CART, COUPONS, MEMBER, PAST_ORDERS } from "./data";
 import { Price } from "./Price";
-import { OrderLineRow } from "./OrderLineRow";
+import { ProductLine } from "./ProductLine";
+import { AmountLine } from "./AmountLine";
+import { DiscountLine } from "./DiscountLine";
 import { OrderStatusTag } from "./OrderStatusTag";
 import { DeliveryMemo } from "./DeliveryMemo";
 import "./market.css";
@@ -190,15 +192,7 @@ export function CheckoutPage() {
       <SectionShell>
         <h2>주문 상품</h2>
         {cart.map((cartItem) => (
-          <OrderLineRow
-            key={cartItem.id}
-            type="product"
-            label={cartItem.name}
-            amount={cartItem.price * cartItem.quantity}
-            thumbnail={cartItem.thumbnail}
-            option={cartItem.option}
-            quantity={cartItem.quantity}
-          />
+          <ProductLine key={cartItem.id} item={cartItem} />
         ))}
       </SectionShell>
 
@@ -248,20 +242,12 @@ export function CheckoutPage() {
 
       <SectionShell>
         <h2>결제 금액</h2>
-        <OrderLineRow type="subtotal" label="상품 금액" amount={itemTotal} />
-        <OrderLineRow type="shipping" label="배송비" amount={shippingFee} />
+        <AmountLine label="상품 금액" amount={itemTotal} />
+        <AmountLine label="배송비" amount={shippingFee} />
         {appliedCoupon ? (
-          <OrderLineRow
-            type="coupon"
-            label="쿠폰 할인"
-            amount={couponDiscount}
-            isDiscount
-            couponCode={appliedCoupon.code}
-          />
+          <DiscountLine label="쿠폰 할인" amount={couponDiscount} code={appliedCoupon.code} />
         ) : null}
-        {usePoint ? (
-          <OrderLineRow type="point" label="적립금 사용" amount={pointDiscount} isDiscount />
-        ) : null}
+        {usePoint ? <DiscountLine label="적립금 사용" amount={pointDiscount} /> : null}
         <div className="total">
           <span>최종 결제 금액</span>
           <Price amount={finalPrice} member={member} />
