@@ -1,5 +1,6 @@
 import type { OrderStatus } from "./types";
 
+// [AI 생성] status를 OrderStatus 유니온으로 좁힘 + switch default에 never 처리 — 직접 검토·수정함
 type Props = {
   status: OrderStatus;
 };

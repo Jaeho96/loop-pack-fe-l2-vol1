@@ -16,6 +16,7 @@ const PAYMENT_LABEL: Record<PaymentMethod, string> = {
 };
 
 // 공통 껍데기 추출: 컴포넌트 계층을 명확히 하고, 스타일을 중앙 집중화하기 위해
+// [AI 생성] children 타입(ReactNode) 보강 — 직접 검토·수정함
 function SectionShell({ children }: { children: ReactNode }) {
   return <div className="section">{children}</div>;
 }
@@ -148,8 +149,9 @@ export function CheckoutPage() {
 
   // ── 최종 금액 ────────────────────────────────
   // 파생값이라 state로 박제하지 않고 렌더 중 계산한다(쿠폰·주소·적립금 변경에 반응).
-  // VIP 10% 할인은 가격 정책이므로 여기서 계산하고, 항목으로도 노출해 합계가 맞게 한다.
   const baseTotal = itemTotal + shippingFee - couponDiscount - pointDiscount;
+  // [AI 생성] VIP 할인 계산·항목화 — 직접 검토·수정함
+  // VIP 10% 할인은 가격 정책이므로 여기서 계산하고, 항목으로도 노출해 합계가 맞게 한다.
   const vipDiscount = member.grade === "VIP" ? baseTotal - Math.round(baseTotal * 0.9) : 0;
   const finalPrice = baseTotal - vipDiscount;
 
@@ -251,6 +253,7 @@ export function CheckoutPage() {
           <DiscountLine label="쿠폰 할인" amount={couponDiscount} code={appliedCoupon.code} />
         ) : null}
         {usePoint ? <DiscountLine label="적립금 사용" amount={pointDiscount} /> : null}
+        {/* [AI 생성] VIP 할인 항목 — 직접 검토·수정함 */}
         {vipDiscount > 0 ? <DiscountLine label="VIP 할인" amount={vipDiscount} /> : null}
         <div className="total">
           <span>최종 결제 금액</span>

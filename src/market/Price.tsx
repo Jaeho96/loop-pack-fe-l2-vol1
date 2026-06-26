@@ -1,3 +1,4 @@
+// [AI 생성] 표시 전용으로 재작성 — 직접 검토·수정함
 type Props = {
   amount: number;
 };

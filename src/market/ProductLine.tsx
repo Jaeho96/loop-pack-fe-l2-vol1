@@ -1,3 +1,4 @@
+// [AI 생성] 직접 검토·수정함
 import type { CartItem } from "./types";
 import { LineAmount } from "./LineAmount";
 
