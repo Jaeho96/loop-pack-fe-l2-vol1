@@ -148,7 +148,10 @@ export function CheckoutPage() {
 
   // ── 최종 금액 ────────────────────────────────
   // 파생값이라 state로 박제하지 않고 렌더 중 계산한다(쿠폰·주소·적립금 변경에 반응).
-  const finalPrice = itemTotal + shippingFee - couponDiscount - pointDiscount;
+  // VIP 10% 할인은 가격 정책이므로 여기서 계산하고, 항목으로도 노출해 합계가 맞게 한다.
+  const baseTotal = itemTotal + shippingFee - couponDiscount - pointDiscount;
+  const vipDiscount = member.grade === "VIP" ? baseTotal - Math.round(baseTotal * 0.9) : 0;
+  const finalPrice = baseTotal - vipDiscount;
 
   const applyCoupon = () => {
     const found = COUPONS.find((c) => c.code === couponCode.trim());
@@ -248,9 +251,10 @@ export function CheckoutPage() {
           <DiscountLine label="쿠폰 할인" amount={couponDiscount} code={appliedCoupon.code} />
         ) : null}
         {usePoint ? <DiscountLine label="적립금 사용" amount={pointDiscount} /> : null}
+        {vipDiscount > 0 ? <DiscountLine label="VIP 할인" amount={vipDiscount} /> : null}
         <div className="total">
           <span>최종 결제 금액</span>
-          <Price amount={finalPrice} member={member} />
+          <Price amount={finalPrice} />
         </div>
       </SectionShell>
 
