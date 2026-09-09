@@ -62,16 +62,25 @@ type RenderOptions = {
   onUrlUpdate?: OnUrlUpdateFunction;
   /** 넘기지 않으면 새로 만든다. 넘기면 이동 호출을 단언할 수 있다. */
   router?: RouterSpy;
+  /**
+   * 넘기지 않으면 새로 만든다. **서버가 심어 준 초기 상태**를 재현할 때 넘긴다 —
+   * (shop) layout이 setQueryData로 세션을 주입하므로, 첫 렌더가 그 값을 보는 것과
+   * 아무 값도 없는 것이 다른 화면이다. 렌더 뒤에 심으면 그 차이가 사라진다.
+   */
+  queryClient?: QueryClient;
 };
 
 // app/layout.tsx는 렌더하지 않는다 — next/font/google과 전역 CSS가 딸려 온다.
 // 화면이 실제로 필요로 하는 경계(QueryClient · nuqs)만 세운다.
 export function renderWithProviders(
   ui: ReactNode,
-  { searchParams = "", onUrlUpdate, router = createRouterSpy() }: RenderOptions = {},
+  {
+    searchParams = "",
+    onUrlUpdate,
+    router = createRouterSpy(),
+    queryClient = createTestQueryClient(),
+  }: RenderOptions = {},
 ) {
-  const queryClient = createTestQueryClient();
-
   const result = render(
     <QueryClientProvider client={queryClient}>
       {/* hasMemory — 어댑터가 갱신된 조건을 기억한다.

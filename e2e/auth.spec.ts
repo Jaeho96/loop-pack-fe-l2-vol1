@@ -2,7 +2,14 @@ import { createSessionToken } from "@/app/api/_data/auth";
 import { SESSION_COOKIE } from "@/app/api/_data/auth-cookies";
 import { authed, currentAccount, expect, setScenario, test } from "./support/fixtures";
 import { TEST_PASSWORD_VALUE } from "./support/accounts";
-import { checkoutPage, header, loginPage, ordersPage } from "./support/pages";
+import {
+  SERVER_SESSION,
+  checkoutPage,
+  header,
+  loginPage,
+  ordersPage,
+  serverRenderedSession,
+} from "./support/pages";
 
 // 3단계에서 정한 시나리오 ①②③. 인증은 빈도 7위(8.6%)인데 붙였다 —
 // 로그는 몇 명이 지나갔나를 말하고 실패 비용은 말하지 않는다. 근거는
@@ -97,6 +104,42 @@ authed.describe("인증 — 세션 만료", () => {
     // 세션 만료 처리 자리가 한 곳(QueryCache.onError)이라, 화면은 그 결과만 그린다.
     await expect(ordersPage(page).failure()).toContainText("세션이 만료되었습니다");
     await expect(page.getByRole("main").getByRole("link", { name: "로그인" })).toBeVisible();
+  });
+});
+
+// ── 채점 피드백(nit) 반영 ───────────────────────────────────────────────────
+// 5단계 E6("초기 HTML의 로그인 상태를 지웠다")은 잡히긴 했지만 실패 메시지가
+// `로그인 계정 루퍼N`을 못 찾는다는 사실까지만 말했다. 그게 **서버 렌더가 빠진
+// 것**인지 **로그인이 안 된 것**인지는 메시지가 가르지 못했고, 원인은 라벨 하나에
+// 두 의미가 겹쳐 있던 것이었다. 헤더가 세 상태를 세 모양으로 그리게 고치고,
+// 여기서 초기 HTML을 셋 중 하나로 접어 값으로 대조한다.
+//
+// `page.goto`를 쓰지 않는다. 브라우저가 하이드레이션하면 클라이언트 세션 조회가
+// 같은 값을 채워 넣어서, 서버가 그린 것인지 클라이언트가 채운 것인지 구분할 수 없다.
+// context의 쿠키를 그대로 싣는 요청으로 **서버가 보낸 문서만** 읽는다.
+authed.describe("인증 — 초기 HTML이 서버의 판정을 담는다", () => {
+  authed("로그인 쿠키를 들고 문서를 받으면 헤더에 계정이 들어 있다", async ({ page }) => {
+    const account = currentAccount();
+
+    const response = await page.request.get("/checkout?productId=p3&quantity=2");
+    expect(response.status()).toBe(200);
+
+    expect(serverRenderedSession(await response.text(), account.name)).toBe(SERVER_SESSION.login);
+  });
+});
+
+test.describe("인증 — 초기 HTML이 서버의 판정을 담는다(미로그인)", () => {
+  // 위 단언이 "무엇이 아니다"가 아니라 "무엇이다"를 보고 있다는 걸 이 짝이 고정한다.
+  // 판정 함수가 한 값만 돌려주면 위 테스트는 쿠키가 없어도 통과한다.
+  test("쿠키가 없으면 같은 문서가 미로그인으로 그려진다", async ({ page }) => {
+    const account = currentAccount();
+
+    const response = await page.request.get("/products");
+    expect(response.status()).toBe(200);
+
+    expect(serverRenderedSession(await response.text(), account.name)).toBe(
+      SERVER_SESSION.anonymous,
+    );
   });
 });
 
