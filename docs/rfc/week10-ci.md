@@ -232,18 +232,76 @@ cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 ## F. After — 측정
 
-> 이 절은 새 워크플로가 돈 뒤 실측으로 채운다. 채우기 전에는 비워 둔다 —
-> 예상값을 적어 두고 나중에 고치는 방식은 "측정했다"가 아니다.
+`34572556200` (2026-09-11). 검증 항목은 Before와 같거나 **늘었다** —
+`format:check`와 `test`가 이제 한 워크플로에 둘 다 있고, **E2E가 CI에서 처음 돌았다.**
+test를 빼서 시간을 줄인 것이 아니다.
 
-| 워크플로 | raw (s) | 중앙값 | 범위 |
-| --- | --- | --- | --- |
-| `ci.yml` verify | _(측정 대기)_ | | |
-| `ci.yml` e2e | _(측정 대기)_ | | |
+| job | 결과 | 시간 |
+| --- | --- | --- |
+| `verify` | success | 53s |
+| `changes` | success | 7s |
+| `e2e` | success | 58s |
+| **전체 wall-clock** | | **73s** |
 
-검증 항목은 Before와 같다(오히려 늘었다 — `format:check`와 `test`가 이제 한 워크플로에
-둘 다 있고, E2E가 CI에 처음 들어왔다). **test를 빼서 시간을 줄인 것이 아니다.**
+### 병목이 실제로 사라졌나 — `Set up pnpm`
 
----
+| | Before(`quality.yml`) | After |
+| --- | --- | --- |
+| raw (s) | 8 · 143 · 424 · 313 · 426 · 422 | **2** |
+| 중앙값 | **367.5** | **2** |
+| 범위 | 8 ~ 426 (폭 418) | — |
+
+**−365.5s.** 이 변화는 Before 측정 폭(418s)보다 작지만, 폭 자체가 이 병목이 만든 것이라
+"흔들림보다 큰 변화인가"를 폭으로 판단하면 순환이 된다. 그래서 C절의 **통제된 대조**
+(같은 커밋·같은 시각 1~2s vs 313~426s)를 근거로 쓴다 — 빠른 쪽 값을 재현한 것이다.
+
+### verify job step 분해 (After)
+
+```
+1s  Set up job              5s  setup-node            3s  pnpm format:check
+1s  checkout                6s  pnpm install          9s  pnpm build
+2s  pnpm/action-setup       4s  pnpm lint             5s  Post setup-node
+                            4s  pnpm typecheck
+                            8s  pnpm test
+```
+
+실제 검증은 **28s**(lint 4 + typecheck 4 + test 8 + format 3 + build 9)이고 나머지 25s가
+환경 준비다. D절에서 job을 쪼개지 않은 근거가 이 숫자다 — 28s를 둘로 나누려고 25s를
+한 번 더 낼 이유가 없다.
+
+### e2e job (After) — CI에서 처음 돈다
+
+```
+0s   실행 여부 판정          ← .github/workflows/ 변경 → run=true
+21s  playwright install --with-deps chromium
+21s  pnpm test:e2e           ← 18개 통과 (build + start 포함)
+```
+
+### Before ↔ After
+
+| | Before | After |
+| --- | --- | --- |
+| 워크플로 | 2벌(중복 실행) | **1벌** |
+| wall-clock | `ci.yml` 41s + `quality.yml` **435s**(중앙값) | **73s** |
+| lint·typecheck·build | **두 번** | 한 번 |
+| `format:check` | `ci.yml`만 | 있음 |
+| `test` | `quality.yml`만 | 있음 |
+| **E2E** | **안 돎**(Chromium만 매번 설치) | **돈다**(조건부) |
+| `permissions` | `ci.yml` 없음 | `contents: read` |
+| `concurrency`·`timeout` | 없음 | 있음 |
+| Node | 22 하드코딩 / `.nvmrc` 혼재 | `.nvmrc` |
+
+> ⚠️ **After도 3회를 못 채웠다.** 남은 시간에 돌린 run 수만큼만 적었다. cold/warm 구분도
+> 통제하지 못했다 — 이 표는 "병목이 사라진 것"은 말하지만 "평균이 얼마나 줄었는지"를
+> 통계적으로 말하지는 못한다. A절의 한계와 같은 성질이다.
+
+### 조건부 실행 증거
+
+| push | 바뀐 것 | `e2e` 판정 |
+| --- | --- | --- |
+| `f3beb3b7` | `.github/workflows/` · `docs/` | **run=true** (workflow 변경) |
+| 앱 코드 커밋 | `src/` · `eslint.config.mjs` | **run=true** |
+| 문서 커밋 | `docs/` 만 | **run=false** — job은 성공으로 끝나고 summary에 이유가 남는다 |
 
 ## G. 4단계 — AI 코드리뷰를 CI에 붙이지 않은 근거
 
