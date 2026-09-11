@@ -83,12 +83,13 @@ export default defineConfig(
         },
         {
           selector:
-            'CallExpression[callee.property.name=/^(toBeTruthy|toBeFalsy)$/] > .callee > .object',
+            "CallExpression[callee.property.name=/^(toBeTruthy|toBeFalsy)$/] > .callee > .object",
           message:
             "toBeTruthy·toBeFalsy는 통과할 때만 정확하고 실패할 때 무엇이 있었는지 말하지 않는다. 값을 직접 대조한다(toBe·toEqual·toHaveTextContent).",
         },
         {
-          selector: 'MemberExpression[property.name="getByTestId"], MemberExpression[property.name="queryByTestId"], MemberExpression[property.name="findByTestId"]',
+          selector:
+            'MemberExpression[property.name="getByTestId"], MemberExpression[property.name="queryByTestId"], MemberExpression[property.name="findByTestId"]',
           message:
             "testid로 조회하지 않는다. 역할·라벨로 조회하면 접근성 계약을 함께 검증하고, testid는 화면이 실제로 읽히는지 말해 주지 않는다.",
         },

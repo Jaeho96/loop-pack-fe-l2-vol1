@@ -295,13 +295,46 @@ test를 빼서 시간을 줄인 것이 아니다.
 > 통제하지 못했다 — 이 표는 "병목이 사라진 것"은 말하지만 "평균이 얼마나 줄었는지"를
 > 통계적으로 말하지는 못한다. A절의 한계와 같은 성질이다.
 
-### 조건부 실행 증거
+### 조건부 실행 증거 — 그리고 여기서 필터를 한 번 잘못 읽었다
 
-| push | 바뀐 것 | `e2e` 판정 |
+문서만 바꾼 커밋(`a95f1ed9`)을 푸시하고 E2E가 스킵될 줄 알았는데 **돌았다.**
+
+원인은 `BASE_SHA`다. `github.event.pull_request.base.sha`는 **PR의 base(= Jaeho96) tip**이라
+`git diff base head`가 **PR 전체의 변경**을 준다. 그 PR에는 앞선 커밋의 `src/` 변경이
+들어 있으니 `app=true`가 맞는 답이었다.
+
+**이건 버그가 아니라 내가 의도를 잘못 적은 것이다.** 그리고 다시 생각해 보니 PR 범위가
+**옳다** — 푸시 단위로 판정하면, `src/`를 고친 PR이 마지막에 문서만 한 줄 고쳐 푸시하는
+것으로 **E2E를 한 번도 안 돌리고 머지될 수 있다.** 게이트는 "이 PR이 무엇을 바꾸는가"를
+봐야 한다.
+
+그래서 스킵을 보이려면 **앱 코드가 없는 별도 PR**이 필요하다.
+
+| PR / run | PR 전체가 바꾼 것 | `e2e` 판정 |
 | --- | --- | --- |
-| `f3beb3b7` | `.github/workflows/` · `docs/` | **run=true** (workflow 변경) |
-| 앱 코드 커밋 | `src/` · `eslint.config.mjs` | **run=true** |
-| 문서 커밋 | `docs/` 만 | **run=false** — job은 성공으로 끝나고 summary에 이유가 남는다 |
+| #206 `34572556200` | `.github/workflows/` · `docs/` | **run=true** — 21s Chromium + 21s 실행, 18개 통과 |
+| #206 `34573139743` | 위 + `src/` | **run=true** (문서만 푸시했어도 PR 범위에 `src/`가 있다) |
+| 별도 문서 PR | `docs/` 만 | **run=false** — job은 성공으로 끝나고 summary에 이유가 남는다 |
+
+> 부수 증거 하나. 중간 run(`34573110603`)이 **`cancelled`** 로 끝났다. 연속 푸시에서
+> `concurrency`가 앞선 PR 실행을 취소한 것이고, 설계한 대로다. 그룹 키에 `ref`가 있고
+> 취소를 PR 이벤트로만 켰기 때문에 **다른 브랜치·`merge_group`은 건드리지 않았다.**
+
+### 그리고 required 게이트가 한 번 빨간불이 됐다 — `format:check`
+
+`a95f1ed9`의 `verify` job이 `pnpm format:check`에서 실패했다. 로컬에서는 통과했는데
+CI에서만 났다. 원인은 둘이 겹쳤다.
+
+1. **`pnpm check`에 `format:check`가 없다.** 로컬 습관이 `pnpm check`라 포맷은 확인되지 않는다.
+2. **lint-staged 패턴이 `*.{ts,tsx,js,jsx}`라 `.mjs`를 잡지 않는다.** 5단계에서 고친 파일이 `eslint.config.mjs`였고, 커밋 훅이 포맷해 주지 않았다.
+
+**이 함정은 내가 이미 알고 기록해 둔 것이었다**(*"CI verify는 format:check를 돌지만 로컬
+`pnpm check`엔 없다 — push 전 `format:check` 필수"*). 알고 있는데 또 밟았다. 5단계에서
+"글로 적는 것은 실패했다"고 쓴 바로 그 패턴이 문서가 아니라 내 절차에서 재현됐다.
+
+> 남는 것: **`pnpm check`에 `format:check`를 넣거나 lint-staged 패턴에 `.mjs`를 더해야
+> 한다.** 둘 다 `package.json`·`.husky` 수정이라 이번 주 범위에서 손대지 않았고, 그래서
+> 이 함정은 아직 살아 있다 — 다음에 또 밟을 수 있다는 뜻으로 여기 적어 둔다.
 
 ## G. 4단계 — AI 코드리뷰를 CI에 붙이지 않은 근거
 
