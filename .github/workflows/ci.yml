@@ -63,7 +63,23 @@ jobs:
       - run: pnpm test
       # `pnpm check`에는 format:check가 없다. 따로 부른다.
       - run: pnpm format:check
+
+      # 3단계 — 설정 게이트를 build **앞에** 둔다. 배포 사고는 코드보다 설정에서
+      # 나고, 빠진 변수를 build 전에 알면 파이프라인이 더 일찍·더 싸게 멈춘다.
+      # 여기서는 기본 모드다(경고만) — 코스가 제공한 파이프라인이 env를 주지 않아
+      # `--production`으로 막으면 build 자체가 못 돈다. 배포 job이 생기면 그쪽에
+      # `--production`을 붙인다.
+      - run: pnpm validate-env
+
       - run: pnpm build
+        env:
+          # self-HTTP용. requireAppOrigin()이 없으면 던진다.
+          APP_ORIGIN: http://localhost:3000
+
+      # 3단계 — 번들 예산. build 뒤라야 매니페스트를 읽을 수 있다.
+      # 임계값은 7주차 LCP 측정값에서 유도했다(scripts/check-bundle-size.mts 주석).
+      # 결과는 $GITHUB_STEP_SUMMARY로 PR 화면에 나온다 — 로그를 열어봐야 알면 안 본다.
+      - run: pnpm size
 
   # ── 무엇이 바뀌었나 ────────────────────────────────────────────────────────
   # third-party action(dorny/paths-filter)을 쓰지 않고 git으로 본다 —
