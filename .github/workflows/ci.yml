@@ -118,8 +118,15 @@ jobs:
           changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
           echo "── 변경된 파일 ──"
           echo "$changed"
-          # 앱 동작에 닿는 것만 고른다. 문서·볼트·설정 주석은 E2E를 흔들지 않는다.
-          if echo "$changed" | grep -qE '^(src/|e2e/|public/|package\.json|pnpm-lock\.yaml|next\.config\.|playwright\.config\.|\.github/workflows/)'; then
+          # 앱 동작에 닿는 것만 고른다. 문서는 E2E를 흔들지 않는다.
+          #
+          # ⚠️ `echo "$changed" | grep -q ...` 로 쓰면 안 된다. `grep -q` 는 첫 매치에서
+          # 즉시 끝나고, 그러면 `echo` 가 SIGPIPE(141)로 죽는다. `set -o pipefail` 이
+          # 그 141을 파이프라인 상태로 올려서 **매치했는데도 if 가 거짓**이 된다.
+          # 즉 `src/` 를 고쳤는데 E2E 가 스킵된다 — 파일 목록이 길 때만 나타난다.
+          # 실측: 변경 5,001줄로 재현했다(Codex 교차 검증에서 나온 자리다).
+          # herestring 을 쓰면 파이프가 없어 SIGPIPE 가 생기지 않는다.
+          if grep -qE '^(src/|e2e/|public/|package\.json|pnpm-lock\.yaml|next\.config\.|playwright\.config\.|vitest\.config\.|eslint\.config\.|tsconfig|\.nvmrc|\.github/workflows/)' <<< "$changed"; then
             echo "app=true" >> "$GITHUB_OUTPUT"
             echo "→ 앱 코드가 바뀌었다: E2E 실행"
           else

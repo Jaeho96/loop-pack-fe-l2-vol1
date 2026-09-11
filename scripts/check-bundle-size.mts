@@ -47,16 +47,30 @@ const TOTAL_BUDGET_KB = 268; // 현재 233KB + 12.5% (셸과 같은 여유 비�
 
 type Budget = { name: string; files: string[]; budgetKb: number; note: string };
 
-function gzipBytes(files: string[]): number {
+// ⚠️ 예전엔 없는 파일을 조용히 건너뛰고 합계를 돌려줬다. 그러면 매니페스트의 청크가
+// 하나도 실재하지 않을 때 **0KB로 예산을 통과한다** — false green이다.
+// (빌드 산출물 경로가 바뀌거나, 매니페스트 키 이름이 달라지면 그렇게 된다.)
+// 게이트가 "아무것도 못 찾았다"를 통과로 읽으면 게이트가 아니다.
+// Codex 교차 검증에서 나온 자리다.
+function gzipBytes(files: string[], label: string): number {
   let total = 0;
+  let found = 0;
   for (const file of files) {
     const full = path.join(NEXT_DIR, file);
     try {
       statSync(full);
     } catch {
-      continue; // 매니페스트에 있는데 파일이 없으면 세지 않는다
+      continue;
     }
+    found += 1;
     total += gzipSync(readFileSync(full), { level: 9 }).length;
+  }
+  if (found === 0) {
+    throw new Error(
+      `[${label}] 잴 파일을 하나도 찾지 못했습니다(대상 ${files.length}개). ` +
+        `pnpm build 를 먼저 돌렸는지, ${NEXT_DIR}/build-manifest.json 의 키가 바뀌지 않았는지 확인하세요. ` +
+        `0KB로 통과시키지 않습니다.`,
+    );
   }
   return total;
 }
@@ -92,7 +106,7 @@ const rows: string[] = [];
 let exceeded = 0;
 
 for (const budget of budgets) {
-  const actualKb = gzipBytes(budget.files) / KB;
+  const actualKb = gzipBytes(budget.files, budget.name) / KB;
   const over = actualKb > budget.budgetKb;
   if (over) {
     exceeded += 1;
