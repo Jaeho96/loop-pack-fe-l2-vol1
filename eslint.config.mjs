@@ -55,6 +55,52 @@ export default defineConfig(
     },
   },
   {
+    // ── 10주차 5단계 — 반복 지적을 결정적 룰로 승격 ──────────────────────────
+    // 10주간 같은 결함을 **네 번** 만들었다. 전부 「단언이 '없음'이나 boolean을
+    // 향해서 실패할 때 대신 무엇이 있었는지 말하지 못한다」는 하나의 뿌리다.
+    //
+    //   8주차  findByText(경계 문구)로 기다림 — 무엇이 없는지만 말한다
+    //   9주차G refetchQueries 직후 findByText("expired") — 변이를 넣어도 초록불
+    //   9주차H 메커니즘만 보고 호출부를 빠뜨려 mutation 4종이 변이를 통과
+    //   9주차I aria-label 하나에 두 의미가 겹쳐 실패 원인이 안 갈림
+    //
+    // 그중 **결정적으로 판별 가능한 것**만 기계로 내린다.
+    // 「없음을 조건 기반 대기로 확인하지 않는다」가 그것이다 — 폴링은 "아직 안
+    // 바뀜"과 "바뀌지 않는 게 맞음"을 구분하지 못한다. 나머지(신호에 두 의미가
+    // 겹쳤는지, 호출부를 봤는지)는 맥락 판단이라 AI·사람에 남긴다.
+    //
+    // `.claude/rules/testing.md`에 글로 적혀 있던 것을 여기로 옮긴 것이기도 하다.
+    // 글은 매번 다시 읽어야 하고, 룰은 한 번 적으면 매 PR에 자동으로 적용된다.
+    // 같은 지적을 네 번 받았다면 리뷰가 부족한 게 아니라 하네스가 비어 있다는 뜻이다.
+    files: ["**/*.test.{ts,tsx}", "e2e/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: 'CallExpression[callee.name="waitFor"] MemberExpression[property.name="not"]',
+          message:
+            "waitFor 안에서 부정 단언을 쓰지 않는다. 폴링은 '아직 안 바뀜'과 '바뀌지 않는 게 맞음'을 구분하지 못해서, 구현을 망가뜨려도 초록불이 된다(8주차·9주차 G절에서 실측). 사라지는 것은 waitForElementToBeRemoved로, 바뀌지 않는 것은 값을 직접 대조해서 확인한다.",
+        },
+        {
+          selector:
+            'CallExpression[callee.property.name=/^(toBeTruthy|toBeFalsy)$/] > .callee > .object',
+          message:
+            "toBeTruthy·toBeFalsy는 통과할 때만 정확하고 실패할 때 무엇이 있었는지 말하지 않는다. 값을 직접 대조한다(toBe·toEqual·toHaveTextContent).",
+        },
+        {
+          selector: 'MemberExpression[property.name="getByTestId"], MemberExpression[property.name="queryByTestId"], MemberExpression[property.name="findByTestId"]',
+          message:
+            "testid로 조회하지 않는다. 역할·라벨로 조회하면 접근성 계약을 함께 검증하고, testid는 화면이 실제로 읽히는지 말해 주지 않는다.",
+        },
+        {
+          selector: 'MemberExpression[object.name="container"][property.name="querySelector"]',
+          message:
+            "container.querySelector로 조회하지 않는다. 구현 구조(클래스·태그)에 묶여서 리팩터링마다 깨지고, 사용자가 보는 것과 무관하다.",
+        },
+      ],
+    },
+  },
+  {
     // 측정용 학습 픽스처: 제품 코드가 아니라 성능 Before를 재현하는 견본이다.
     // 룰을 끄는 것이 아니라 적용 범위를 좁히는 선언 —
     // 이유가 붙은 한 줄 억제만 허용하고, 파일 전체 억제는 여기서도 금지한다.
