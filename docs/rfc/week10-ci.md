@@ -314,7 +314,30 @@ test를 빼서 시간을 줄인 것이 아니다.
 | --- | --- | --- |
 | #206 `34572556200` | `.github/workflows/` · `docs/` | **run=true** — 21s Chromium + 21s 실행, 18개 통과 |
 | #206 `34573139743` | 위 + `src/` | **run=true** (문서만 푸시했어도 PR 범위에 `src/`가 있다) |
-| 별도 문서 PR | `docs/` 만 | **run=false** — job은 성공으로 끝나고 summary에 이유가 남는다 |
+| #209 `34573610403` | `docs/` 1개 (base를 `volume-10`으로 둠) | **run=false** — 아래 |
+
+`#209`의 `e2e` job 로그가 설계한 그대로다.
+
+```
+── e2e  success  4s
+     success  실행 여부 판정          ← app=false
+     skipped  checkout
+     skipped  pnpm/action-setup
+     skipped  setup-node
+     skipped  pnpm install
+     skipped  playwright install --with-deps chromium
+     skipped  pnpm test:e2e
+     success  스킵 기록               ← summary에 이유와 run-e2e 사용법
+── verify  success  50s               ← lint·typecheck·test·format·build 전부 실행
+```
+
+**58s → 4s**, Chromium도 받지 않는다. 그리고 job이 **success**이므로 `e2e`를 required로
+둬도 이 PR은 머지 가능하다 — `if:`를 job에 걸었다면 여기가 "체크 대기"로 막혔다.
+
+> `#208`을 먼저 만들었는데 **base를 `Jaeho96`으로 잡아 실패했다.** 그 브랜치에는 새
+> `ci.yml`이 없어서 옛 워크플로 두 벌이 돌았다(`changes`·`e2e` job 자체가 없다).
+> `pull_request`는 **head 브랜치의 워크플로**로 돈다는 것을 몸으로 확인한 자리다.
+> base를 `volume-10`으로 바꿔 다시 열었다(`#209`).
 
 > 부수 증거 하나. 중간 run(`34573110603`)이 **`cancelled`** 로 끝났다. 연속 푸시에서
 > `concurrency`가 앞선 PR 실행을 취소한 것이고, 설계한 대로다. 그룹 키에 `ref`가 있고
