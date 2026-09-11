@@ -77,7 +77,20 @@ export default defineConfig(
       "no-restricted-syntax": [
         "error",
         {
-          selector: 'CallExpression[callee.name="waitFor"] MemberExpression[property.name="not"]',
+          // ⚠️ 첫 판은 `MemberExpression[property.name="not"]`만 봤다. 프로브를 돌려 두 결함을 찾았다.
+          //   오탐 — `waitFor` 안의 `expect.not.objectContaining({...})`을 막았다.
+          //          그건 부정 단언이 아니라 **matcher 헬퍼**다. `expect.not`은 object가
+          //          식별자 `expect`이고, 막아야 하는 `expect(x).not`은 object가 호출식이다.
+          //          그래서 `[object.callee.name="expect"]`로 좁힌다.
+          //   누락 — `vi.waitFor(...)`는 callee가 MemberExpression이라 `callee.name`으로 안 잡혔다.
+          //          두 번째 selector로 멤버 호출도 본다.
+          //
+          // 남는 한계: `import { waitFor as wf }`처럼 이름을 바꾸면 못 잡는다. 구문 규칙의
+          // 한계이고, 이 레포는 전부 `waitFor`로 import하므로 좇지 않는다 — 변이 실험이 그
+          // 자리를 맡는다. (「한계」로 쓰지만 원인을 알고 받아들인 트레이드오프다.)
+          selector:
+            'CallExpression[callee.name="waitFor"] MemberExpression[object.callee.name="expect"][property.name="not"],' +
+            'CallExpression[callee.property.name="waitFor"] MemberExpression[object.callee.name="expect"][property.name="not"]',
           message:
             "waitFor 안에서 부정 단언을 쓰지 않는다. 폴링은 '아직 안 바뀜'과 '바뀌지 않는 게 맞음'을 구분하지 못해서, 구현을 망가뜨려도 초록불이 된다(8주차·9주차 G절에서 실측). 사라지는 것은 waitForElementToBeRemoved로, 바뀌지 않는 것은 값을 직접 대조해서 확인한다.",
         },

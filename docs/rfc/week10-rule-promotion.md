@@ -115,6 +115,55 @@ expect(screen.queryAllByRole("alert")).toHaveLength(0);
 | `pnpm typecheck` | 통과 |
 | `pnpm test` | **23파일 175개 통과** |
 
+### ④ selector를 프로브로 때려 봤다 — 오탐 1건 · 누락 1건이 나왔다
+
+룰이 "기존 코드를 통과시키고 위반을 막는다"까지는 확인했는데, 그건 **내가 쓴 형태만**
+본 것이다. selector는 구문을 보므로 다른 형태로 쓰면 빠져나갈 수 있다. 그래서 경계
+케이스를 파일 하나에 모아 돌렸다.
+
+첫 판 selector는 `CallExpression[callee.name="waitFor"] MemberExpression[property.name="not"]`
+이었고, 둘이 틀렸다.
+
+| | 코드 | 첫 판 | 왜 |
+| --- | --- | --- | --- |
+| **오탐** | `waitFor(() => expect(v).toEqual(expect.not.objectContaining({...})))` | **막았다** ❌ | `expect.not`은 부정 단언이 아니라 **matcher 헬퍼**다. 정상 코드를 막았다 |
+| **누락** | `vi.waitFor(() => expect(1).not.toBe(2))` | **놓쳤다** ❌ | callee가 MemberExpression이라 `callee.name`에 안 걸린다 |
+
+가르는 지점이 있었다. **`expect.not`의 object는 식별자 `expect`고, 막아야 하는
+`expect(x).not`의 object는 호출식이다.** 그래서 `[object.callee.name="expect"]`로 좁히고,
+멤버 호출용 selector를 하나 더 붙였다.
+
+```js
+selector:
+  'CallExpression[callee.name="waitFor"] MemberExpression[object.callee.name="expect"][property.name="not"],' +
+  'CallExpression[callee.property.name="waitFor"] MemberExpression[object.callee.name="expect"][property.name="not"]',
+```
+
+고친 뒤 프로브 9개 결과:
+
+| 잡혀야 하는 것 | 결과 |
+| --- | --- |
+| `toBeTruthy` · `toBeFalsy` | ✅ |
+| `waitFor` 블록 안 부정 · 한 줄 부정 | ✅ |
+| `vi.waitFor` 안 부정 | ✅ **(고쳐서 잡힘)** |
+
+| 통과해야 하는 것 | 결과 |
+| --- | --- |
+| `waitFor` 밖의 단발 부정 | ✅ 통과 |
+| `waitFor` 안의 긍정 단언 | ✅ 통과 |
+| `waitFor` 안의 `expect.not` 헬퍼 | ✅ **통과(오탐 고쳐짐)** |
+
+**5건 검출 · 오탐 0.**
+
+남는 한계 하나는 고치지 않았다. `import { waitFor as wf }`처럼 **이름을 바꾸면 못 잡는다.**
+구문 규칙의 원리적 한계이고, 이 레포는 전부 `waitFor`로 import한다. 이건 원인을 알고
+**받아들이기로 한 트레이드오프**라 「한계」로 쓴다 — 9주차에 배운 구분(원인을 모르는 것이
+한계, 아는데 안 고친 것은 미룬 일)에 따르면 이쪽이다. 그 자리는 변이 실험이 맡는다.
+
+> **교훈.** 룰을 켜서 초록불인 것으로는 룰이 맞다고 말할 수 없다. 8주차에 테스트를
+> 변이로 때려 봤던 것과 같은 절차가 **룰에도 필요하다** — 룰도 코드이고, 내가 쓴 형태만
+> 확인하면 내가 안 쓰는 형태는 검증 밖이다.
+
 ### ④ 룰을 껐다 켜서 확인
 
 고친 코드를 **일부러 옛 형태로 되돌려** 돌렸다.
