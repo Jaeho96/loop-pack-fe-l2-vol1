@@ -88,9 +88,15 @@ export default defineConfig(
           // 남는 한계: `import { waitFor as wf }`처럼 이름을 바꾸면 못 잡는다. 구문 규칙의
           // 한계이고, 이 레포는 전부 `waitFor`로 import하므로 좇지 않는다 — 변이 실험이 그
           // 자리를 맡는다. (「한계」로 쓰지만 원인을 알고 받아들인 트레이드오프다.)
-          selector:
-            'CallExpression[callee.name="waitFor"] MemberExpression[object.callee.name="expect"][property.name="not"],' +
+          // `[object.callee.name="expect"]` 만 보면 `expect(p).resolves.not` ·
+          // `.rejects.not` 체인을 놓친다(Codex 교차 검증). object 가 `expect(...)` 인 경우와
+          // `expect(...).resolves` 인 경우를 둘 다 본다.
+          selector: [
+            'CallExpression[callee.name="waitFor"] MemberExpression[object.callee.name="expect"][property.name="not"]',
             'CallExpression[callee.property.name="waitFor"] MemberExpression[object.callee.name="expect"][property.name="not"]',
+            'CallExpression[callee.name="waitFor"] MemberExpression[object.object.callee.name="expect"][object.property.name=/^(resolves|rejects)$/][property.name="not"]',
+            'CallExpression[callee.property.name="waitFor"] MemberExpression[object.object.callee.name="expect"][object.property.name=/^(resolves|rejects)$/][property.name="not"]',
+          ].join(","),
           message:
             "waitFor 안에서 부정 단언을 쓰지 않는다. 폴링은 '아직 안 바뀜'과 '바뀌지 않는 게 맞음'을 구분하지 못해서, 구현을 망가뜨려도 초록불이 된다(8주차·9주차 G절에서 실측). 사라지는 것은 waitForElementToBeRemoved로, 바뀌지 않는 것은 값을 직접 대조해서 확인한다.",
         },
@@ -101,13 +107,22 @@ export default defineConfig(
             "toBeTruthy·toBeFalsy는 통과할 때만 정확하고 실패할 때 무엇이 있었는지 말하지 않는다. 값을 직접 대조한다(toBe·toEqual·toHaveTextContent).",
         },
         {
+          // Codex 교차 검증: 복수형(getAllByTestId 등)과 문자열 프로퍼티
+          // (`screen["getByTestId"]`)가 전부 빠져 있었다. 메시지는 "testid로 조회하지
+          // 않는다"인데 강제 범위가 그보다 좁았다 — 메시지가 거짓이 되지 않게 넓힌다.
+          // 구조 분해(`const { getByTestId } = render(...)`)는 못 잡는다(binding 추적이
+          // 필요하다). 알고 받아들이는 한계다.
           selector:
-            'MemberExpression[property.name="getByTestId"], MemberExpression[property.name="queryByTestId"], MemberExpression[property.name="findByTestId"]',
+            "MemberExpression[property.name=/^(get|query|find)(All)?ByTestId$/]," +
+            "MemberExpression[property.value=/^(get|query|find)(All)?ByTestId$/]",
           message:
             "testid로 조회하지 않는다. 역할·라벨로 조회하면 접근성 계약을 함께 검증하고, testid는 화면이 실제로 읽히는지 말해 주지 않는다.",
         },
         {
-          selector: 'MemberExpression[object.name="container"][property.name="querySelector"]',
+          // querySelectorAll 도 같은 문제다(Codex 교차 검증).
+          // `render(...).container.querySelector` 나 이름을 바꾼 binding 은 못 잡는다.
+          selector:
+            'MemberExpression[object.name="container"][property.name=/^querySelectorAll?$/]',
           message:
             "container.querySelector로 조회하지 않는다. 구현 구조(클래스·태그)에 묶여서 리팩터링마다 깨지고, 사용자가 보는 것과 무관하다.",
         },

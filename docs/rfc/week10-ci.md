@@ -614,3 +614,38 @@ selector 프로브(오탐 1 · 누락 1)는 **제가 먼저 찾아 고치는 중
 성질이 옮겨 가고 있다. 처음엔 코드가 틀렸고, 이제는 **코드에 대해 내가 적어 둔 것**과
 **검증 장치 자체**가 틀린다. 게이트를 만드는 주에 게이트가 통과시키면 안 되는 것을
 통과시켰다는 게 J2·J3의 요지다 — **검증을 만들면 그 검증도 검증해야 한다.**
+
+### J4~J6. 2차 지적 — 게이트의 강제 범위가 메시지보다 좁았다
+
+J1~J3을 고친 뒤 Codex가 낸 최종 보고에 셋이 더 있었다. 성질이 하나로 묶인다 —
+**메시지는 넓게 말하는데 실제로 막는 범위는 좁았다.** 게이트가 거짓 약속을 한 셈이다.
+
+| | 무엇이 | 고침 |
+| --- | --- | --- |
+| **J4** | `expect(p).resolves.not` · `.rejects.not` 체인이 빠져나갔다. `[object.callee.name="expect"]`만 보면 `expect(p).resolves`가 object라 안 걸린다 | selector 4개로 체인까지 본다 |
+| **J5** | 메시지는 "testid로 조회하지 않는다"인데 **복수형**(`getAllByTestId` 등)과 문자열 프로퍼티(`screen["getByTestId"]`)가 전부 통과했다 | 정규식으로 `(get\|query\|find)(All)?ByTestId`와 `property.value`까지 |
+| **J6** | `querySelectorAll`이 대상이 아니었다 | `/^querySelectorAll?$/` |
+
+프로브로 4건 검출 · 정상 코드 통과를 확인했다.
+
+### 안 고친 지적 — 받아들인 한계
+
+| 지적 | 왜 안 고쳤나 |
+| --- | --- |
+| `import { waitFor as wf }` 별칭 우회 | Codex 말이 맞다 — **AST 규칙의 원리적 한계가 아니라 이름 기반 selector의 한계**다. binding을 추적하려면 custom rule을 써야 하고, 이 레포는 전부 `waitFor`로 import한다. 변이 실험이 그 자리를 맡는다 |
+| `const { getByTestId } = render(...)` 구조 분해 | 같은 이유(binding 추적) |
+| `validator.toBeTruthy()` 오탐 | `expect`에서 시작한 체인인지 확인해야 하는데 지금 selector 형태로는 안 된다. 이 레포에 그런 호출이 없고, 오탐이 나면 이름을 바꾸면 된다 — **이 방향의 오탐은 싸다** |
+| **`.env*` 파일을 읽지 않는다** | **이게 남은 것 중 가장 큰 구멍이다.** 검증기는 `process.env`만 읽고 뒤의 `next build`는 `.env.production` 등을 읽는다. 즉 **검증기와 빌드가 다른 설정을 본다.** `@next/env`가 pnpm strict에서 직접 해석되지 않아 의존성을 추가해야 하고, lockfile·CI 캐시를 건드리는 일이라 마감 30분 전에 하지 않았다. **미룬 일이지 한계가 아니다** — 9주차에 정리한 구분에 따라 그렇게 적는다 |
+| `concurrency` 주석이 보장 범위를 과장 | 사실이다. `cancel-in-progress`가 거짓이어도 **대기 중인 실행은 교체된다**(A 실행·B 대기·C 도착이면 B가 밀린다). "main의 실행은 기록이어야 한다"는 주석이 그보다 약한 보장을 과장했다. 문구를 고치는 것이 맞지만 동작 변경이 아니라 여기 적어 둔다 |
+
+### 확인만 된 것 (지적이 아니었다)
+
+`pull_request_target` 없음 · `run:`에 `${{ }}` 직접 삽입 없음(전부 `env`로 감쌈) ·
+secrets 전달 0건 · SHA 핀 누락 없음 · checkout `persist-credentials: false` ·
+`contents: read`로도 `upload-artifact`는 동작(별도 Actions runtime token을 쓴다) ·
+`git diff A B`는 force push에서도 두 객체만 있으면 동작 · `IS_DRAFT`가 빈 문자열이어도
+분기가 옳음 · step guard 누락 없음.
+
+> **PR checkout이 합성 merge commit인데 필터는 PR head를 비교한다**는 지적은 받아 둔다.
+> base에만 들어간 변경까지 잡아 **불필요한 E2E를 더 돌릴 수** 있다 — 안전한 방향의
+> 부정확이라 고치지 않았다. 반대 방향(덜 돌림)이면 고쳐야 했다.

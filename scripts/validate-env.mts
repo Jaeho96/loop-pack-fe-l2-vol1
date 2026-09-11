@@ -49,16 +49,32 @@ if (appOrigin === undefined || appOrigin === "") {
   try {
     parsed = new URL(appOrigin);
   } catch {
-    fail("APP_ORIGIN", `절대 URL이 아닙니다: ${appOrigin}`);
+    fail("APP_ORIGIN", "절대 URL이 아닙니다(스킴을 포함한 origin을 넣으세요).");
   }
 
   if (parsed !== undefined) {
     if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      fail("APP_ORIGIN", `http·https만 허용합니다: ${parsed.protocol}`);
+      fail("APP_ORIGIN", `http·https만 허용합니다(받은 스킴: ${parsed.protocol}).`);
     }
-    // 경로·쿼리가 붙으면 self-HTTP가 만드는 URL이 어긋난다.
+    // ⚠️ 값 원문을 찍지 않는다. 잘못 넣은 값에 비밀이 섞여 있을 수 있다 —
+    // 실측으로 `https://host/?token=…` 을 넣으면 그 토큰이 보고서와 step summary에
+    // 그대로 남았다(Codex 교차 검증에서 나온 자리다).
+    // "정상 origin은 공개 정보"라는 사실은 **검증에 실패한 입력에도 비밀이 없다**는
+    // 근거가 되지 않는다. 종류만 말하고 값은 말하지 않는다.
     if (parsed.pathname !== "/" || parsed.search !== "" || parsed.hash !== "") {
-      fail("APP_ORIGIN", `origin만 넣으세요(경로·쿼리 없이): ${appOrigin}`);
+      const parts = [
+        parsed.pathname !== "/" ? "경로" : undefined,
+        parsed.search !== "" ? "쿼리" : undefined,
+        parsed.hash !== "" ? "프래그먼트" : undefined,
+      ].filter((part) => part !== undefined);
+      fail("APP_ORIGIN", `origin만 넣으세요 — ${parts.join("·")}가 붙어 있습니다.`);
+    }
+    // 자격 증명이 박힌 URL은 Node의 Request가 거부한다. 형태로 막을 수 있다.
+    if (parsed.username !== "" || parsed.password !== "") {
+      fail(
+        "APP_ORIGIN",
+        "URL에 자격 증명(user:pass@)이 들어 있습니다. Node의 Request가 거부하고, 값이 로그에 남습니다.",
+      );
     }
     const isLocal =
       parsed.hostname === "localhost" ||
@@ -68,11 +84,11 @@ if (appOrigin === undefined || appOrigin === "") {
       if (isLocal) {
         fail(
           "APP_ORIGIN",
-          `배포인데 로컬 주소를 가리킵니다: ${appOrigin}. 서버가 자기 자신을 못 찾습니다.`,
+          `배포인데 로컬 호스트(${parsed.hostname})를 가리킵니다. 서버가 자기 자신을 못 찾습니다.`,
         );
       }
       if (parsed.protocol === "http:") {
-        fail("APP_ORIGIN", `배포에서는 https를 쓰세요: ${appOrigin}`);
+        fail("APP_ORIGIN", "배포에서는 https를 쓰세요.");
       }
     }
   }
